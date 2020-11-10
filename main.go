@@ -31,21 +31,23 @@ type config struct {
 }
 
 type users struct {
-	id         int              `json:"id"`
-	ipaddress  net.IP           `json:"ip"`
-	macaddress net.HardwareAddr `json:"mac"`
-	startTime  int64            `json:"added"`
-	activeTime int64            `json:"active"`
-	duration   int64            `json:"duration"`
-	token      string           `json:"token"`
-	state      string           `json:"state"`
-	download   int64            `json:"downloaded"`
-	upload     int64            `json:"uploaded"`
+	id         int64            `json:"clients,string,id"`
+	ipaddress  net.IP           `json:"clients,string,ip"`
+	macaddress net.HardwareAddr `json:"clients,string,mac"`
+	startTime  int64            `json:"clients,string,added"`
+	activeTime int64            `json:"clients,string,active"`
+	duration   int64            `json:"clients,string,duration"`
+	token      string           `json:"clients,string,token"`
+	state      string           `json:"clients,string,state"`
+	download   int64            `json:"clients,string,downloaded"`
+	upload     int64            `json:"clients,string,uploaded"`
 }
 
+/*
 type status struct {
 	clients []users
 }
+*/
 
 // Get values from the Enviroment and set the config.
 func startup() config {
@@ -181,7 +183,7 @@ func main() {
 			continue
 		}
 
-		var current map[string]users
+		var current map[string]interface{}
 
 		output, err := session.CombinedOutput("ndsctl json")
 		if err != nil {
@@ -193,10 +195,18 @@ func main() {
 			log.Fatal(err)
 		}
 
-		for x := range current {
-			fmt.Println(current[x].id)
+		for key, value := range current {
+			fmt.Printf("Key: %s\n", key)
+			fmt.Printf("Value: %s\n", value)
+			break
 		}
-		// fmt.Println(string(output))
+
+		/*
+			for x := range current {
+				fmt.Println(current[x])
+			}
+			// fmt.Println(string(output))
+		*/
 	}
 	client.Close()
 
