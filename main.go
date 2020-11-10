@@ -31,21 +31,21 @@ type config struct {
 }
 
 type users struct {
-	id         int64            `json:"id"`
-	ipaddress  net.IP           `json:"ip"`
-	macaddress net.HardwareAddr `json:"mac"`
-	startTime  int64            `json:"added"`
-	activeTime int64            `json:"active"`
-	duration   int64            `json:"duration"`
-	token      string           `json:"token"`
-	state      string           `json:"state"`
-	download   int64            `json:"downloaded"`
-	upload     int64            `json:"uploaded"`
+	Id         json.Number `json:"id"`
+	Ipaddress  string      `json:"ip"`
+	Macaddress string      `json:"mac"`
+	StartTime  json.Number `json:"added"`
+	ActiveTime json.Number `json:"active"`
+	Duration   json.Number `json:"duration"`
+	Token      string      `json:"token"`
+	State      string      `json:"state"`
+	Download   json.Number `json:"downloaded"`
+	Upload     json.Number `json:"uploaded"`
 }
 
 type status struct {
-	clientlength string `json:"client_list_length"`
-	clients      map[string]users
+	Clientlength string           `json:"client_list_length"`
+	Clients      map[string]users `json:"clients"`
 }
 
 // Get values from the Enviroment and set the config.
@@ -194,9 +194,9 @@ func main() {
 			log.Fatal(err)
 		}
 
-		fmt.Println("Going to print")
+		fmt.Printf("Going to print length: %s\n", current.Clientlength)
 
-		for key, value := range current.clients {
+		for key, value := range current.Clients {
 			fmt.Printf("Key: %s\n", key)
 			fmt.Printf("Value: %s\n", value)
 			break
