@@ -31,16 +31,16 @@ type config struct {
 }
 
 type users struct {
-	id         int
-	ipaddress  net.IP
-	macaddress net.HardwareAddr
-	added      int64
-	active     int64
-	duration   int64
-	token      string
-	state      string
-	downloaded int64
-	uploaded   int64
+	id         int              `json:"id"`
+	ipaddress  net.IP           `json:"ip"`
+	macaddress net.HardwareAddr `json:"mac"`
+	startTime  int64            `json:"added"`
+	activeTime int64            `json:"active"`
+	duration   int64            `json:"duration"`
+	token      string           `json:"token"`
+	state      string           `json:"state"`
+	download   int64            `json:"downloaded"`
+	upload     int64            `json:"uploaded"`
 }
 
 type status struct {
@@ -181,17 +181,20 @@ func main() {
 			continue
 		}
 
-		var current status
+		var current map[string]users
 
 		output, err := session.CombinedOutput("ndsctl json")
 		if err != nil {
 			panic(err)
 		}
 
-		json.Unmarshal([]byte(output), &current)
+		err = json.Unmarshal([]byte(output), &current)
+		if err != nil {
+			log.Fatal(err)
+		}
 
-		for x := range current.clients {
-			fmt.Println(current.clients[x].id)
+		for x := range current {
+			fmt.Println(current[x].id)
 		}
 		// fmt.Println(string(output))
 	}
