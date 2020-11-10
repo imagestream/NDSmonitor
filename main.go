@@ -7,10 +7,13 @@ Desc:   This program scrapes the ndsctl command and stores the results in a
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"log"
 	"net"
 	"os"
+	"strconv"
+	"time"
 
 	"golang.org/x/crypto/ssh"
 )
@@ -24,9 +27,27 @@ type config struct {
 	ndshostname string
 	ndsip       net.IP
 	sshkey      bool
+	refresh     int
 }
 
-// Get values from the Enviroment and set the par
+type users struct {
+	id         int
+	ipaddress  net.IP
+	macaddress net.HardwareAddr
+	added      int64
+	active     int64
+	duration   int64
+	token      string
+	state      string
+	downloaded int64
+	uploaded   int64
+}
+
+type status struct {
+	clients []users
+}
+
+// Get values from the Enviroment and set the config.
 func startup() config {
 	var s config
 
@@ -44,6 +65,17 @@ func startup() config {
 		log.Fatal("No ssh username specified")
 	} else {
 		s.username = os.Getenv("username")
+	}
+
+	// FIX this when it's not 12:30am
+	if os.Getenv("Polltime") == "" {
+		log.Fatal("No Poll Rate specified")
+	} else {
+		refresh, err := strconv.Atoi(os.Getenv("Polltime"))
+		if err != nil {
+			log.Fatal("Bad Polling time")
+		}
+		s.refresh = refresh
 	}
 
 	// Check for a password if it's not set then we check to see if the SSH key file is present.
@@ -67,29 +99,6 @@ func fileExists(filename string) bool {
 		return false
 	}
 	return !info.IsDir()
-}
-
-// Connect to the server
-func connectToHost(user, password, host string) (*ssh.Client, *ssh.Session, error) {
-	sshConfig := &ssh.ClientConfig{
-		User: user,
-		Auth: []ssh.AuthMethod{ssh.Password(password)},
-	}
-
-	sshConfig.HostKeyCallback = ssh.InsecureIgnoreHostKey()
-
-	client, err := ssh.Dial("tcp", host, sshConfig)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	session, err := client.NewSession()
-	if err != nil {
-		client.Close()
-		return nil, nil, err
-	}
-
-	return client, session, nil
 }
 
 /*
@@ -122,6 +131,23 @@ func connectSSH(s config) conn {
 }
 */
 
+// Connect to the server with a password
+func connectToHost(user, password, host string) (*ssh.Client, error) {
+	sshConfig := &ssh.ClientConfig{
+		User: user,
+		Auth: []ssh.AuthMethod{ssh.Password(password)},
+	}
+
+	sshConfig.HostKeyCallback = ssh.InsecureIgnoreHostKey()
+
+	client, err := ssh.Dial("tcp", host, sshConfig)
+	if err != nil {
+		return nil, err
+	}
+
+	return client, nil
+}
+
 func main() {
 	settings := startup()
 	fmt.Println("Startup Successful! Beginning monitoring loop")
@@ -133,16 +159,42 @@ func main() {
 		fmt.Printf("Using this password: %s\n", settings.password)
 	}
 
-	client, session, err := connectToHost(settings.username, settings.password, settings.ndshostname)
+	client, err := connectToHost(settings.username, settings.password, settings.ndshostname)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	output, err := session.CombinedOutput("ndsctl json")
-	if err != nil {
-		panic(err)
+	//var ndsusers []users
+
+	ticker := time.NewTicker(time.Second * time.Duration(settings.refresh))
+
+	for range ticker.C {
+		/*  FIX this when it's not 12:30am
+		if the session errors, we are going to close the client So I need to figure-out if I want to move the
+		connect into the ticker for loop.
+		*/
+		session, err := client.NewSession()
+		if err != nil {
+			client.Close()
+			log.Println(err)
+			log.Println("Reconnecting next refresh interval")
+			continue
+		}
+
+		var current status
+
+		output, err := session.CombinedOutput("ndsctl json")
+		if err != nil {
+			panic(err)
+		}
+
+		json.Unmarshal([]byte(output), &current)
+
+		for x := range current.clients {
+			fmt.Println(current.clients[x].id)
+		}
+		// fmt.Println(string(output))
 	}
-	fmt.Println(string(output))
 	client.Close()
 
 }
