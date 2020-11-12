@@ -14,6 +14,7 @@ import (
 	"net"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 
 	"golang.org/x/crypto/ssh"
@@ -178,7 +179,7 @@ func probeNDS(dbqueue chan influxclient.BatchPoints, c config, session *ssh.Sess
 		}
 
 		// Set the tags for this host. We overwrite these everytime through the loop
-		looptags["Mac_Address"] = value.Macaddress
+		looptags["Mac_Address"] = strings.ToUpper(value.Macaddress)
 		looptags["Ip_Address"] = value.Ipaddress
 		looptags["ID"] = value.ID.String()
 		looptags["Token"] = value.Token
