@@ -186,7 +186,7 @@ func probeNDS(dbqueue chan influxclient.BatchPoints, c config, session *ssh.Sess
 		looptags["Auth"] = value.State
 
 		/*
-			The output for these values are in KB so since I want bytes
+			The output for these values are in KB. So since I want bytes
 			like a sane person, I have to convert them and then multiply by
 			1024.
 		*/
@@ -205,6 +205,7 @@ func probeNDS(dbqueue chan influxclient.BatchPoints, c config, session *ssh.Sess
 			upBytes = upBytes * 1024
 		}
 
+		// We don't log any information for unauthenticated clients
 		if skip != true && value.State == "Authenticated" {
 			queuePointint("Download_Bytes", looptags, downBytes, bp)
 			queuePointint("Upload_Bytes", looptags, upBytes, bp)
@@ -226,13 +227,6 @@ func probeNDS(dbqueue chan influxclient.BatchPoints, c config, session *ssh.Sess
 func main() {
 	settings := startup()
 	fmt.Println("Startup Successful! Beginning monitoring loop")
-
-	fmt.Printf("Going to use Username: %s\n", settings.Username)
-	if settings.sshkey {
-		fmt.Println("Using SSH Private Key")
-	} else {
-		fmt.Printf("Using this password: %s\n", settings.Password)
-	}
 
 	client, err := connectToHost(settings.Username, settings.Password, settings.Ndshostname)
 	if err != nil {
