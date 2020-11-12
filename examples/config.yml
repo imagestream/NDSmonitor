@@ -1,0 +1,10 @@
+---
+username: "ssh username"
+password: "ssh password"
+ndshostname: "127.0.0.1:22"
+name: "User provided name"
+refresh: 30
+influxdb: "Database name"
+influxdbserver: "http://example.com:8086"
+influxusername: "your username"
+influxpassword: "Your password"
