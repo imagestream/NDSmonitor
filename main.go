@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"log"
+	"log/syslog"
 	"net"
 	"os"
 	"strconv"
@@ -23,7 +24,7 @@ import (
 	influxclient "github.com/influxdata/influxdb1-client/v2"
 )
 
-const version string = "0.01"
+const version string = "0.02"
 const privatesshkey string = "/etc/NDSmonitor/id_rsa"
 const configfile string = "/etc/NDSmonitor/config.yml"
 
@@ -62,6 +63,11 @@ type status struct {
 // Get values from the Enviroment and set the config.
 func startup() config {
 	var s config
+
+	logwriter, err := syslog.New(syslog.LOG_NOTICE, "NDSmonitor")
+	if err == nil {
+		log.SetOutput(logwriter)
+	}
 
 	log.Printf("NDS Monitor version: %s Starting up. \n", version)
 
