@@ -24,7 +24,7 @@ import (
 	influxclient "github.com/influxdata/influxdb1-client/v2"
 )
 
-const version string = "0.02"
+const version string = "0.03"
 const privatesshkey string = "/etc/NDSmonitor/id_rsa"
 const configfile string = "/etc/NDSmonitor/config.yml"
 
@@ -165,12 +165,17 @@ func probeNDS(dbqueue chan influxclient.BatchPoints, c config, session *ssh.Sess
 
 	output, err := session.CombinedOutput("ndsctl json")
 	if err != nil {
-		panic(err)
+		log.Println(err)
+		if string(output) == "ndsctl: nodogsplash probably not started (Error: Connection refused)" {
+			log.Println("NoDogSplash is not running on remote system.")
+		}
+		return
 	}
 
 	err = json.Unmarshal([]byte(output), &current)
 	if err != nil {
-		log.Fatal(err)
+		log.Println(err)
+		return
 	}
 
 	for _, value := range current.Clients {
@@ -246,18 +251,33 @@ func main() {
 
 	ticker := time.NewTicker(time.Second * time.Duration(settings.Refresh))
 
+	var active int
+
 	for range ticker.C {
-		/*  FIX this when it's not 12:30am
-		if the session errors, we are going to close the client So I need to figure-out if I want to move the
-		connect into the ticker for loop.
+		active++
+
+		mark := active % 30
+
+		if mark == 0 {
+			log.Println(" Still active")
+		}
+
+		/*
+			First try on the reconnection logic. If we can't create a new session.
+			We close the current session. And then try to connect again.
+			I am going to need to see failure in connectivity to see if this works.
 		*/
 		session, err := client.NewSession()
 		if err != nil {
 			client.Close()
 			log.Println(err)
-			log.Println("Reconnecting next Refresh interval")
+			log.Println("Attempting to reconnect")
+			client, err = connectToHost(settings.Username, settings.Password, settings.Ndshostname)
+			if err != nil {
+				log.Println(err)
+			}
 			continue
 		}
-		probeNDS(DbQueue, settings, session)
+		go probeNDS(DbQueue, settings, session)
 	}
 }
