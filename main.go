@@ -159,6 +159,7 @@ func probeNDS(dbqueue chan influxclient.BatchPoints, c config, session *ssh.Sess
 	var current status
 	var authenticated int
 	var preauth int
+	var ndsError bool
 
 	// Allocate a new batch point for this probe
 	bp := newInfluxBP(c)
@@ -168,14 +169,13 @@ func probeNDS(dbqueue chan influxclient.BatchPoints, c config, session *ssh.Sess
 		log.Println(err)
 		if string(output) == "ndsctl: nodogsplash probably not started (Error: Connection refused)" {
 			log.Println("NoDogSplash is not running on remote system.")
+			ndsError = true
 		}
-		return
 	}
 
 	err = json.Unmarshal([]byte(output), &current)
 	if err != nil {
 		log.Println(err)
-		return
 	}
 
 	for _, value := range current.Clients {
@@ -223,8 +223,13 @@ func probeNDS(dbqueue chan influxclient.BatchPoints, c config, session *ssh.Sess
 		}
 	}
 
-	queuePointint("Authenticated", tags, authenticated, bp)
-	queuePointint("PreAuth", tags, preauth, bp)
+	if ndsError {
+		queuePointint("NdsError", tags, 1, bp)
+	} else {
+		queuePointint("Authenticated", tags, authenticated, bp)
+		queuePointint("PreAuth", tags, preauth, bp)
+		queuePointint("NdsError", tags, 0, bp)
+	}
 
 	// Send the batchpoints the the Database server
 	if len(dbqueue) < 1000 {
