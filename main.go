@@ -151,6 +151,8 @@ func connectToHost(user, Password, host string) (*ssh.Client, error) {
 
 // Probe the remote host and queue the data for influxdb
 func probeNDS(dbqueue chan influxclient.BatchPoints, c config, session *ssh.Session) {
+	// Lets see how long the probe takes to run. So we can identify if we are having long probe times
+	startProbe := time.Now()
 
 	// Setup the Tags we will be using later
 	tags := make(map[string]string)
@@ -237,6 +239,11 @@ func probeNDS(dbqueue chan influxclient.BatchPoints, c config, session *ssh.Sess
 		dbqueue <- bp
 	} else {
 		log.Println("Influx DB Queue Full, not recording sample")
+	}
+
+	probeDuration := time.Since(startProbe)
+	if probeDuration >= time.Duration(180)*time.Second {
+		log.Printf("Probe Duration took : %s", probeDuration)
 	}
 }
 
