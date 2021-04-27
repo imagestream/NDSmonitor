@@ -1,6 +1,6 @@
 # Joshua Snyder 11-12-2020
 
-FROM golang:1.15.2-alpine3.12 as builder
+FROM golang:1.16.3-alpine3.13 as builder
 RUN apk add --no-cache --virtual .build-deps gcc musl-dev openssl git openssh
 
 RUN go get github.com/influxdata/influxdb1-client/v2

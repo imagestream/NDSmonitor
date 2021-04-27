@@ -24,7 +24,7 @@ import (
 	influxclient "github.com/influxdata/influxdb1-client/v2"
 )
 
-const version string = "0.03"
+const version string = "0.05"
 const privatesshkey string = "/etc/NDSmonitor/id_rsa"
 const configfile string = "/etc/NDSmonitor/config.yml"
 
@@ -35,11 +35,13 @@ type config struct {
 	Name           string
 	ndsip          net.IP
 	sshkey         bool
+	SelfMonitor    bool
 	Refresh        int
 	InfluxdbServer string
 	InfluxDB       string
 	InfluxUsername string
 	InfluxPassword string
+	AllowRestart   bool
 }
 
 type users struct {
@@ -149,6 +151,21 @@ func connectToHost(user, Password, host string) (*ssh.Client, error) {
 	return client, nil
 }
 
+/*
+Restart Nds on the remote system:
+Currently we have a hardwired location for the init script not sure if this
+will ever be different from this default so leaving it like this for now.
+*/
+func restartNDS(c config, session *ssh.Session) error {
+	output, err := session.CombinedOutput("/etc/init.d/nodogsplash restart")
+	if err != nil {
+		log.Println(err)
+		return err
+	}
+	log.Println(output)
+	return nil
+}
+
 // Probe the remote host and queue the data for influxdb
 func probeNDS(dbqueue chan influxclient.BatchPoints, c config, session *ssh.Session) {
 	// Lets see how long the probe takes to run. So we can identify if we are having long probe times
@@ -169,9 +186,20 @@ func probeNDS(dbqueue chan influxclient.BatchPoints, c config, session *ssh.Sess
 	output, err := session.CombinedOutput("ndsctl json")
 	if err != nil {
 		log.Println(err)
-		if string(output) == "ndsctl: nodogsplash probably not started (Error: Connection refused)" {
-			log.Println("NoDogSplash is not running on remote system.")
-			ndsError = true
+		ndsError = true
+	}
+
+	// Check if we got output indcating Nodogsplash isn't running and raise an error if it's not.
+	if string(output) == "ndsctl: nodogsplash probably not started (Error: Connection refused)" {
+		log.Println("NoDogSplash is not running on remote system.")
+		ndsError = true
+	}
+
+	// If we got an error above restart the NDS on the remote Opuntia/OpenWrt system
+	if ndsError && c.AllowRestart {
+		restartNDS(c, session)
+		if err != nil {
+			log.Println(err)
 		}
 	}
 
@@ -233,17 +261,21 @@ func probeNDS(dbqueue chan influxclient.BatchPoints, c config, session *ssh.Sess
 		queuePointint("NdsError", tags, 0, bp)
 	}
 
+	probeDuration := time.Since(startProbe)
+	if c.SelfMonitor {
+		queuePointint("ProbeTime", tags, int(time.Since(startProbe)), bp)
+	}
+
+	if probeDuration >= time.Duration(180)*time.Second {
+		log.Printf("Probe Duration took : %s", probeDuration)
+	}
+
 	// Send the batchpoints the the Database server
 	if len(dbqueue) < 1000 {
 		// Queue the batch point to the dbworker queue
 		dbqueue <- bp
 	} else {
 		log.Println("Influx DB Queue Full, not recording sample")
-	}
-
-	probeDuration := time.Since(startProbe)
-	if probeDuration >= time.Duration(180)*time.Second {
-		log.Printf("Probe Duration took : %s", probeDuration)
 	}
 }
 
