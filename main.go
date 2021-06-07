@@ -62,7 +62,7 @@ type status struct {
 	Clients      map[string]users `json:"clients"`
 }
 
-// Get values from the Enviroment and set the config.
+// Get values from the Environment and set the config.
 func startup() config {
 	var s config
 
